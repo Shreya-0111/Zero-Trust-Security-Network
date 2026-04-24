@@ -1,0 +1,60 @@
+# AI Infrastructure specific ignores
+
+# ML Models
+ml_models/*.h5
+ml_models/*.pkl
+ml_models/*.pt
+ml_models/*.pth
+ml_models/*.onnx
+ml_models/*.pb
+
+# GeoIP Databases
+geoip2/*.mmdb
+geoip2/*.dat
+
+# Logs
+logs/*.log
+logs/*.pid
+
+# Blockchain
+build/
+node_modules/
+.truffle/
+
+# Redis
+dump.rdb
+appendonly.aof
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# IPFS
+.ipfs/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak

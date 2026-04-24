@@ -1,0 +1,226 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null && 
+             request.auth.token.role == 'admin';
+    }
+    
+    // Helper function to check if user is security officer
+    function isSecurityOfficer() {
+      return request.auth != null && 
+             (request.auth.token.role == 'security_officer' || request.auth.token.role == 'admin');
+    }
+    
+    // Helper function to check if user is faculty
+    function isFaculty() {
+      return request.auth != null && 
+             (request.auth.token.role == 'faculty' || 
+              request.auth.token.role == 'security_officer' || 
+              request.auth.token.role == 'admin');
+    }
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the resource
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Helper function to check security clearance level
+    function hasSecurityClearance(requiredLevel) {
+      return request.auth != null && 
+             request.auth.token.securityClearance >= requiredLevel;
+    }
+    
+    // Helper function to check if user has high trust score
+    function hasHighTrustScore() {
+      return request.auth != null && 
+             request.auth.token.trustScore >= 80;
+    }
+    
+    // Audit Logs - Multi-level access control
+    match /auditLogs/{logId} {
+      // Security officers and admins can read audit logs
+      allow read: if isSecurityOfficer();
+      
+      // Only backend service can write (enforced by service account)
+      allow write: if false;
+    }
+    
+    // Users collection - Enhanced with risk profiles
+    match /users/{userId} {
+      // Users can read their own data, security officers can read all
+      allow read: if isOwner(userId) || isSecurityOfficer();
+      
+      // Users can update their own profile (limited fields)
+      allow update: if isOwner(userId) && 
+                       request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['displayName', 'email', 'preferences', 'lastActivity']);
+      
+      // Only admins can create/delete users or modify security-sensitive fields
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() && !isOwner(userId);
+    }
+    
+    // Device Fingerprints - Enhanced security
+    match /deviceFingerprints/{deviceId} {
+      // Users can read their own devices, admins can read all
+      allow read: if isAuthenticated() && 
+                     (resource.data.userId == request.auth.uid || isAdmin());
+      
+      // Only backend service can write
+      allow write: if false;
+    }
+    
+    // Visitor Sessions - Host and admin access
+    match /visitorSessions/{sessionId} {
+      // Hosts can read their visitor sessions, admins can read all
+      allow read: if isAuthenticated() && 
+                     (resource.data.hostId == request.auth.uid || isAdmin());
+      
+      // Only backend service can write
+      allow write: if false;
+    }
+    
+    // Resource Segments - Role-based access
+    match /resourceSegments/{segmentId} {
+      // All authenticated users can read basic info
+      allow read: if isAuthenticated();
+      
+      // Only admins can modify resource segments
+      allow write: if isAdmin();
+    }
+    
+    // JIT Access Requests - User and admin access
+    match /jitAccessRequests/{requestId} {
+      // Users can read their own requests, admins can read all
+      allow read: if isAuthenticated() && 
+                     (resource.data.userId == request.auth.uid || isAdmin());
+      
+      // Users can create requests for themselves
+      allow create: if isAuthenticated() && 
+                       request.resource.data.userId == request.auth.uid;
+      
+      // Only admins can update/delete requests
+      allow update, delete: if isAdmin();
+    }
+    
+    // Break-Glass Emergency Requests - Admin access required
+    match /breakGlassRequests/{requestId} {
+      // Users can read their own requests, admins can read all
+      allow read: if isAuthenticated() && 
+                     (resource.data.userId == request.auth.uid || isAdmin());
+      
+      // Users can create emergency requests
+      allow create: if isAuthenticated() && 
+                       request.resource.data.userId == request.auth.uid;
+      
+      // Only admins can approve/deny requests
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // Continuous Authentication Sessions - User and security officer access
+    match /continuousAuthSessions/{sessionId} {
+      // Users can read their own sessions, security officers can read all
+      allow read: if isAuthenticated() && 
+                     (resource.data.userId == request.auth.uid || isSecurityOfficer());
+      
+      // Only backend service can write
+      allow write: if false;
+    }
+    
+    // Security Events - Security officer access
+    match /securityEvents/{eventId} {
+      // Security officers and admins can read security events
+      allow read: if isSecurityOfficer();
+      
+      // Only backend service can write
+      allow write: if false;
+    }
+    
+    // Access Requests - Enhanced with security levels
+    match /accessRequests/{requestId} {
+      // Users can read their own requests, security officers can read all
+      allow read: if isAuthenticated() && 
+                     (resource.data.userId == request.auth.uid || isSecurityOfficer());
+      
+      // Users can create requests for themselves
+      allow create: if isAuthenticated() && 
+                       request.resource.data.userId == request.auth.uid;
+      
+      // Security officers can update requests
+      allow update: if isSecurityOfficer();
+      
+      // Only admins can delete requests
+      allow delete: if isAdmin();
+    }
+    
+    // Policies - Enhanced role-based access
+    match /policies/{policyId} {
+      // All authenticated users can read active policies
+      allow read: if isAuthenticated() && resource.data.isActive == true;
+      
+      // Security officers can read all policies
+      allow read: if isSecurityOfficer();
+      
+      // Only admins can write policies
+      allow write: if isAdmin();
+    }
+    
+    // System Configuration - Admin only with audit trail
+    match /systemConfig/{document=**} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+    
+    // Notifications - Enhanced with security context
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Users can update their own notifications (mark as read only)
+      allow update: if isAuthenticated() && 
+                       resource.data.userId == request.auth.uid &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+      
+      // Only backend service can create/delete
+      allow create, delete: if false;
+    }
+    
+    // ML Models and Training Data - Admin and security officer access
+    match /mlModels/{modelId} {
+      allow read: if isSecurityOfficer();
+      allow write: if isAdmin();
+    }
+    
+    // Behavioral Baselines - User and security officer access
+    match /behavioralBaselines/{userId} {
+      // Users can read their own baselines, security officers can read all
+      allow read: if isOwner(userId) || isSecurityOfficer();
+      
+      // Only backend service can write
+      allow write: if false;
+    }
+    
+    // Risk Assessments - Security officer access
+    match /riskAssessments/{assessmentId} {
+      allow read: if isSecurityOfficer();
+      allow write: if false; // Only backend service
+    }
+    
+    // Incident Reports - Security officer and admin access
+    match /incidentReports/{reportId} {
+      allow read: if isSecurityOfficer();
+      allow create: if isSecurityOfficer();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}
