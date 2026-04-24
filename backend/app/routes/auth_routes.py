@@ -71,15 +71,6 @@ def verify_session_token(token):
 def get_user_from_firestore(uid):
     """Get user data from Firestore with fallback"""
     if not FIREBASE_AVAILABLE or not get_firestore_client:
-        # Return mock user for development
-        if IS_DEV and BYPASS_FIREBASE:
-            return {
-                'uid': uid,
-                'email': 'dev@example.com',
-                'name': 'Development User',
-                'role': 'user',
-                'email_verified': True
-            }
         return None
     
     try:
@@ -94,15 +85,6 @@ def get_user_from_firestore(uid):
         return None
     except Exception as e:
         print(f"Error getting user from Firestore: {e}")
-        # Fallback for development
-        if IS_DEV and BYPASS_FIREBASE:
-            return {
-                'uid': uid,
-                'email': 'dev@example.com',
-                'name': 'Development User',
-                'role': 'user',
-                'email_verified': True
-            }
         return None
 
 def create_user_in_firestore(user_data):
@@ -494,9 +476,13 @@ def signup():
             }), 400
 
         # Verify Firebase token
-        if not verify_firebase_token:
+        decoded_token = None
+        if verify_firebase_token:
+            decoded_token = verify_firebase_token(id_token)
+        
+        if not decoded_token:
             if IS_DEV and BYPASS_FIREBASE:
-                # Development bypass
+                # Last resort development fallback if verify_firebase_token failed and bypass is on
                 decoded_token = {
                     'uid': 'dev_user_12345678',
                     'email': 'dev@example.com',
@@ -504,13 +490,6 @@ def signup():
                     'name': name
                 }
             else:
-                return jsonify({
-                    "success": False,
-                    "error": {"code": "FIREBASE_ERROR", "message": "Firebase not configured properly"}
-                }), 500
-        else:
-            decoded_token = verify_firebase_token(id_token)
-            if not decoded_token:
                 return jsonify({
                     "success": False,
                     "error": {"code": "INVALID_TOKEN", "message": "Invalid Firebase token"}

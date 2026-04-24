@@ -25,6 +25,10 @@ except ImportError as e:
     print(f"Warning: ML libraries not available: {e}")
     SKLEARN_AVAILABLE = False
     TORCH_AVAILABLE = False
+    # Mock classes to prevent NameError
+    class MockModule:
+        pass
+    nn = type('MockNN', (), {'Module': MockModule})
 
 
 class LSTMBehavioralModel(nn.Module):

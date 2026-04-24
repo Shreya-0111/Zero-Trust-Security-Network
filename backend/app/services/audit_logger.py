@@ -76,8 +76,11 @@ class AuditLogger:
                 return None
             
             # Save to Firestore
-            log_ref = self.db.collection('auditLogs').document(audit_log.log_id)
-            log_ref.set(audit_log.to_dict())
+            if self.db:
+                log_ref = self.db.collection('auditLogs').document(audit_log.log_id)
+                log_ref.set(audit_log.to_dict())
+            else:
+                print(f"⚠️ Audit Log NOT saved to Firestore (DB unavailable): {audit_log.action}")
             
             # Send alert for high-severity events
             if severity in ['high', 'critical']:

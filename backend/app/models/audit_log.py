@@ -256,9 +256,15 @@ def create_audit_log(
     if not is_valid:
         raise Exception(f"Audit log validation failed: {error_message}")
     
-    # Create audit log document in Firestore
-    log_ref = db.collection('auditLogs').document(audit_log.log_id)
-    log_ref.set(audit_log.to_dict())
+    # Create audit log document in Firestore if DB is available
+    if db:
+        try:
+            log_ref = db.collection('auditLogs').document(audit_log.log_id)
+            log_ref.set(audit_log.to_dict())
+        except Exception as e:
+            print(f"⚠️ Failed to save audit log to Firestore: {str(e)}")
+    else:
+        print(f"⚠️ Audit Log NOT saved (DB unavailable): {audit_log.action}")
     
     return audit_log
 

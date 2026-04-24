@@ -319,8 +319,8 @@ connection_pool_service = ConnectionPoolService()
 # DISABLE AUTOMATIC INITIALIZATION FOR FAST STARTUP
 # Initialize only when needed (lazy loading)
 import os
-if os.getenv('FLASK_ENV') != 'development' and os.getenv('ENABLE_CONNECTION_POOLS', 'false').lower() == 'true':
-    # Only initialize in production if explicitly enabled
+if os.getenv('FLASK_ENV') != 'development' and os.getenv('ENABLE_CONNECTION_POOLS', 'false').lower() == 'true' and os.name == 'posix':
+    # Only initialize in production if explicitly enabled and on POSIX systems
     try:
         import signal
         
@@ -329,15 +329,13 @@ if os.getenv('FLASK_ENV') != 'development' and os.getenv('ENABLE_CONNECTION_POOL
         
         # Set a 5-second timeout for initialization (reduced from 10)
         signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(5)
         
         connection_pool_service.initialize()
         
-        signal.alarm(0)  # Cancel the alarm
         print("Connection pools initialized")
     except TimeoutError:
         print("Connection pool initialization timed out - will initialize on first use")
     except Exception as e:
         print(f"Connection pool initialization failed: {e}")
 else:
-    print("Connection pools disabled for fast startup - will initialize on demand")
+    print("Connection pools disabled for fast startup or platform not supported- will initialize on demand")
